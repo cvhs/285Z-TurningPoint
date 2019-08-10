@@ -1,0 +1,41 @@
+//leftDriveFront.setStopping(brakeType::brake);
+    //leftDriveBack.setStopping(brakeType::brake);
+    //rightDriveFront.setStopping(brakeType::brake);
+    //rightDriveBack.setStopping(brakeType::brake);
+    
+    task distanceMonitor(printShit);
+    resetMotors();
+    
+    int step1 {1250};
+    moveRight(step1, 50);
+    moveLeft(step1, 50);
+    
+    	
+    
+    this_thread::sleep_for(200);
+    resetMotors();                     
+            
+    int step2 {-step1 -720};
+    moveRight(step2, 50);
+    moveLeft(step2, 50);
+  
+    while(leftDriveFront.rotation(rotationUnits::deg) > (step2 + 50)){
+        this_thread::sleep_for(10);
+    }
+    
+    this_thread::sleep_for(200);
+    resetMotors();                     
+                         
+    moveRight(-205, 50);
+    moveLeft(205, 50);
+                         
+    while(leftDriveFront.rotation(rotationUnits::deg) < 200){
+        this_thread::sleep_for(10);
+    }
+    
+    this_thread::sleep_for(200); 
+    resetMotors();
+    
+    int step3 {1725};
+    moveRight(step3, 80);
+    moveLeft(step3, 80);

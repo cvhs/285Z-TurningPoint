@@ -1,0 +1,318 @@
+#include "robot-config.h"   //< Code for this is after the main function
+#define current_rpm mFlywheel.velocity(velocityUnits::rpm)
+
+// Note: voltage passed to the motor ranges from -12 V to +12 V //
+void pdPID(int target) {
+    double power {0};
+    double error {target - current_rpm};
+    double last_error {0};
+    
+    double kp {0};
+    double kd {0};
+    double ki {0};
+    
+    while(fabs(error) > 5){
+        error = current_rpm;
+        double calc_P {kp * error};
+        double calc_D {kd * (error - last_error)};
+        double calc_I {0};
+        
+        if(error < 20){
+            calc_I = ki * (error + last_error);
+        }
+        
+        power = calc_P + calc_D + calc_I;
+        
+        mFlywheel.spin(directionType::fwd, power, voltageUnits::volt);   //yea this really needs to be checked before we run so we don't trash smth
+        
+        this_thread::sleep_for(10);
+    }
+}
+
+static bool reverse {false};
+static bool toggle {false};
+static int mode {1}; 
+
+void Toggle()
+{
+    toggle = !toggle;
+
+    if (toggle)
+        mIntake.spin(directionType::fwd, 100, velocityUnits::pct);
+    else
+        mIntake.spin(directionType::fwd, 0, velocityUnits::pct);
+}
+
+void puIntake()
+    {mIntake.spin(directionType::fwd, 100, velocityUnits::pct);}
+void pdIntake()
+{
+    mIntake.spin(directionType::fwd, 0, velocityUnits::pct);
+    reverse = false;
+}
+void rIntake()
+{
+    mIntake.spin(directionType::fwd, -100, velocityUnits::pct);
+    reverse = true;
+}
+
+void puIndexer()
+    {mIndexer.spin(directionType::fwd, 100, velocityUnits::pct);}
+void pdIndexer()
+    {mIndexer.spin(directionType::fwd, 0, velocityUnits::pct);}
+void rIndexer()
+    {mIndexer.spin(directionType::fwd, -100, velocityUnits::pct);}
+
+
+
+void nlDrive_Tank_l()
+{
+    int speed {joystick.Axis3.value()};
+    if (abs(speed) < 5)
+        speed = 0;
+    else
+        speed = ( (speed^2/100) * speed ) / 100;
+    
+    if (joystick.Axis3.value() < 0)
+        speed = speed * -1;
+    else
+        speed = speed *  1;
+    
+    mDrive_l1.spin(directionType::fwd, speed, velocityUnits::pct);
+    mDrive_l2.spin(directionType::fwd, speed, velocityUnits::pct);
+}
+void nlDrive_Tank_r()
+{
+    int speed {joystick.Axis2.value()};
+    if (abs(speed) < 5)
+        speed = 0;
+    else
+        speed = ( (speed^2/100) * speed ) / 100;
+    
+    if (joystick.Axis2.value() < 0)
+        speed = speed * -1;
+    else
+        speed = speed *  1;
+    
+    mDrive_r1.spin(directionType::fwd, speed, velocityUnits::pct);
+    mDrive_r2.spin(directionType::fwd, speed, velocityUnits::pct);
+}
+
+void nlDrive_Arcade_l()
+{
+    int speed {( joystick.Axis3.value() + joystick.Axis4.value() ) / 2};
+    if (abs(speed) < 5)
+        speed = 0;
+    else
+        speed = ( (speed^2/100) * speed ) / 100;
+    
+    if ((( joystick.Axis3.value() + joystick.Axis4.value() ) / 2) < 0)
+        speed = speed * -1;
+    else
+        speed = speed *  1;
+    
+    mDrive_l1.spin(directionType::fwd, speed, velocityUnits::pct);
+    mDrive_l2.spin(directionType::fwd, speed, velocityUnits::pct);
+}
+void nlDrive_Arcade_r()
+{
+    int speed {( joystick.Axis3.value() - joystick.Axis4.value() ) / 2};
+    if (abs(speed) < 5)
+        speed = 0;
+    else
+        speed = ( (speed^2/100) * speed ) / 100;
+    
+    if ((( joystick.Axis3.value() - joystick.Axis4.value() ) / 2) < 0)
+        speed = speed * -1;
+    else
+        speed = speed *  1;
+    
+    mDrive_r1.spin(directionType::fwd, speed, velocityUnits::pct);
+    mDrive_r2.spin(directionType::fwd, speed, velocityUnits::pct);
+}
+
+void nlDrive_SplitArcade_l()
+{
+    int speed {( joystick.Axis3.value() + joystick.Axis1.value() ) / 2};
+    if (abs(speed) < 5)
+        speed = 0;
+    else
+        speed = ( (speed^2/100) * speed ) / 100;
+    
+    if ((( joystick.Axis3.value() + joystick.Axis1.value() ) / 2) < 0)
+        speed = speed * -1;
+    else
+        speed = speed *  1;
+    
+    mDrive_l1.spin(directionType::fwd, speed, velocityUnits::pct);
+    mDrive_l2.spin(directionType::fwd, speed, velocityUnits::pct);
+}
+void nlDrive_SplitArcade_r()
+{
+    int speed {( joystick.Axis3.value() - joystick.Axis1.value() ) / 2};
+    if (abs(speed) < 5)
+        speed = 0;
+    else
+        speed = ( (speed^2/100) * speed ) / 100;
+    
+    if ((( joystick.Axis3.value() - joystick.Axis1.value() ) / 2) < 0)
+        speed = speed * -1;
+    else
+        speed = speed *  1;
+    
+    mDrive_r1.spin(directionType::fwd, speed, velocityUnits::pct);
+    mDrive_r2.spin(directionType::fwd, speed, velocityUnits::pct);
+}
+
+void park()
+{
+    mDrive_l1.stop();
+    mDrive_l2.stop();
+    mDrive_r1.stop();
+    mDrive_r2.stop();
+}
+
+void controlSwitch()
+{
+         if (mode == 1)
+    {
+        joystick.Axis3.changed(nlDrive_Tank_l);
+        joystick.Axis2.changed(nlDrive_Tank_r);
+    }
+    else if (mode == 2)
+    {
+        joystick.Axis3.changed(nlDrive_Arcade_l);
+        joystick.Axis2.changed(nlDrive_Arcade_r);
+    }
+    else if (mode == 3)
+    {
+        joystick.Axis3.changed(nlDrive_SplitArcade_l);
+        joystick.Axis2.changed(nlDrive_SplitArcade_r);
+    }
+    
+    if (mode >= 4)
+        mode = 1;
+}
+
+
+
+void pFlywheel()
+{
+    int target {170};
+    
+    int lamp {( sLight_top.value(analogUnits::pct) + sLight_bottom.value(analogUnits::pct) ) / 2};
+    if (60 <= lamp && lamp <= 70)           //> will probiblly need to callibrate
+        mFlywheel.spin(directionType::fwd, target, velocityUnits::rpm);
+    else
+        //mFlywheel.stop();
+        mFlywheel.spin(directionType::fwd, 50, velocityUnits::rpm);
+    
+    if(current_rpm < (target-10))
+    {
+            pdPID(target-20);
+            mFlywheel.spin(directionType::fwd, target-20, velocityUnits::rpm);
+            this_thread::sleep_for(1000);            
+    }
+}
+
+
+
+int main()
+{
+    while( 0==0 )
+    {
+    Brain.Screen.clearScreen();
+        
+    Brain.Screen.print(mDrive_l1.temperature(percentUnits::pct));
+        Brain.Screen.newLine();
+    Brain.Screen.print(mDrive_l2.temperature(percentUnits::pct));
+        Brain.Screen.newLine();
+    Brain.Screen.print(mDrive_r1.temperature(percentUnits::pct));
+        Brain.Screen.newLine();
+    Brain.Screen.print(mDrive_r2.temperature(percentUnits::pct));
+        Brain.Screen.newLine();
+
+    Brain.Screen.print(mIntake.temperature(percentUnits::pct));
+        Brain.Screen.newLine();
+    Brain.Screen.print(mIndexer.temperature(percentUnits::pct));
+        Brain.Screen.newLine(); 
+    }
+                          
+/************** Flywheel Controller **************/
+    
+    sLight_top.changed(pFlywheel);
+    sLight_bottom.changed(pFlywheel);
+    
+/***************** Drive Control *****************/
+    
+    joystick.ButtonL1.pressed(controlSwitch);
+    joystick.ButtonA.pressed(park);
+       
+/************* Ball Intake & Indexer *************/
+    
+    joystick.ButtonR1.pressed(puIndexer);   //> indexer 
+    joystick.ButtonR1.released(pdIndexer);
+
+    joystick.ButtonR2.pressed(Toggle);      //> intake toggle
+
+   
+    joystick.ButtonL2.pressed(rIntake);     //> reverse
+    joystick.ButtonL2.pressed(rIndexer);
+
+    joystick.ButtonL2.released(pdIntake);
+    joystick.ButtonL2.released(pdIndexer);
+
+}
+
+
+
+
+/*
+using namespace vex;
+
+class motor_special : public motor {
+    private:
+      uint32_t  _local_index;
+
+    public:
+      motor_special( int32_t index ) :  motor( index ), _local_index(index) {};  
+      ~motor_special() {};
+
+      // Allow overloading of base class methods
+      using motor::spin;
+      
+      // This is similar, not quite the same, as new a method in the next (Nov ?) SDK release
+      // voltage can be +/-12.0 volta or +/-12000 mV
+      void spin( directionType dir, double voltage, voltageUnits units ) {
+        // convert volts to mV is necessary
+        int32_t voltage_mv = (units == voltageUnits::volt ? voltage * 1000.0 : voltage );
+
+        // flip based on direction flag
+        voltage_mv = (dir == directionType::fwd ? voltage_mv : -(voltage_mv) );
+
+        if( voltage_mv == 0 ) {
+          stop();
+        } else {
+          // send mV value to control motor open loop
+          vexMotorVoltageSet( _local_index, voltage_mv );
+        }
+      }
+  };
+
+
+
+brain Brain;
+controller joystick = controller();
+
+motor mDrive_l1 = motor(PORT1);
+motor mDrive_l2 = motor(PORT2);
+motor mDrive_r1 = motor(PORT3);
+motor mDrive_r2 = motor(PORT4);
+    
+motor_special mFlywheel(PORT5);
+light sLight_top = light(Brain.ThreeWirePort.A);
+light sLight_bottom = light(Brain.ThreeWirePort.B);
+
+motor mIntake = motor(PORT6);
+motor mIndexer = motor(PORT7);
+*/

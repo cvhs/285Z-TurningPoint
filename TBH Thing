@@ -1,0 +1,141 @@
+#include "robot-config.h"
+using namespace vex;          
+
+int herambe_is_dead() {return 1;}
+int windows_is_greater_than_macos() {return 1;}
+
+template <typename T> int sgn(T val) {
+    return ( T(0) < val ) - ( val < T(0) );
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! //
+// PLEASE GO TO THE CONCLUSION AT THE END //
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! //
+
+typedef struct FlywheelControllerVariables
+{
+    float m_rpm {0};                // motor rpm
+    float t_rpm {0};                // target rpm
+    
+    float c_error {0};              // current error
+    float l_error {0};              // last error
+    
+    float gain {0};                 // a constant that is used to control how aggressive the algorithm is at trying to get the motor to the target velocity
+    
+    float drive {0};                // this variable has a range of 0 to 1 // 0 = motor stopped // 1 = motor full speed //
+    float drive_approx {0};
+    float drive_at_zero {0};        
+    
+    float m_drive {0};              // motor drive
+    
+    long first_cross {1};
+} FlywheelControllerVariables;
+static FlywheelControllerVariables flywheel;
+
+void GetFlywheelVelocity(FlywheelControllerVariables * fw)
+{
+    fw->m_rpm = MFlywheel.velocity(velocityUnits::rpm);
+}
+
+void SetFlywheelPower(int target)
+{
+    MFlywheel.spin(directionType::fwd, target, velocityUnits::pct);
+}
+
+void FlywheelControllerUpdater(FlywheelControllerVariables * fw)
+{
+    fw->c_error = fw->t_rpm - fw->m_rpm;
+    
+    fw->drive = fw->drive + ( fw->c_error * fw->gain );
+    
+    if( fw->drive > 1 )
+          fw->drive = 1;
+    if( fw->drive < 0 )
+          fw->drive = 0;
+    
+    // Check for zero crossing
+    if( sgn(fw->c_error) != sgn(fw->l_error) ) 
+    {
+        // First zero crossing after a new set velocity command
+        if(fw->first_cross)
+        {
+            // Set drive to the open loop approximation
+            fw->drive = fw->drive_approx;
+            fw->first_cross = 0;
+        }
+        else
+            fw->drive = 0.5 * ( fw->drive + fw->drive_at_zero );
+
+        // Save this drive value in the "tbh" variable
+        fw->drive_at_zero = fw->drive;
+    }
+    
+    fw->l_error = fw->c_error;
+}
+
+int FlywheelController( FlywheelControllerVariables * fw, int velocity, float predicted_drive )
+{
+    fw->t_rpm = velocity;
+    
+    fw->c_error = fw->t_rpm - fw->m_rpm;
+    fw->l_error = fw->c_error;
+    
+    fw->drive_approx = predicted_drive;
+    
+    fw->first_cross = 1;
+    fw->drive_at_zero = 0;
+    
+    
+    
+    fw->gain = 0.00025;
+    
+    // this loop calculates motor speed and determines what control value needs to be sent to the motor
+    while( herambe_is_dead() )
+    {
+        GetFlywheelVelocity(fw);
+        
+        FlywheelControllerUpdater(fw);
+        
+        fw->m_drive = ( fw->drive * 100 ) + 0.5;
+        
+        // this is just a logic saftey net
+        if( fw->m_drive >  100 ) fw->m_drive =  100;
+        if( fw->m_drive < -100 ) fw->m_drive = -100;
+        
+        SetFlywheelPower(fw->m_drive);
+        
+        task::sleep(25);
+    }
+    
+    return 0;
+}
+
+void HalfBang( FlywheelControllerVariables * fw, int target, int predicted_drive, int threshold )
+{
+    int high {75};
+    int low {50};
+    
+    while( windows_is_greater_than_macos() )
+    {
+        GetFlywheelVelocity(fw);
+      
+        if( abs( target - fw->m_rpm ) > threshold )
+        {
+            if(fw->m_rpm < target)          MFlywheel.spin(directionType::fwd, high, velocityUnits::pct);
+            else if(fw->m_rpm > target)     MFlywheel.spin(directionType::fwd, low, velocityUnits::pct);
+        }
+        else FlywheelController( &flywheel, target, predicted_drive );
+    }
+}
+
+int main() 
+{
+    MFlywheel.spin(directionType::fwd, 150, velocityUnits::rpm);
+    //FlywheelController( &flywheel, 150, 0.75 );
+    //HalfBang( &flywheel, 150, 0.5, 25);
+    
+    return 0;
+}
+
+
+// Conclusion: The built PID in the new v5 motors works well enough to justify not homebrewing an original contorl loop...to a degree
